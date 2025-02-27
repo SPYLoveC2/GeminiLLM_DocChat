@@ -2,6 +2,10 @@
 uploaded_data/*
 !uploaded_data/.gitkeep
 
+# Embedding folder 
+embedding/*
+!embedding/.gitkeep
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
