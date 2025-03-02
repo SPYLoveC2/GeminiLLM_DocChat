@@ -1,5 +1,10 @@
 import streamlit as  st
 import os
+import google.generativeai as genai
+from langchain.prompts import PromptTemplate
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_community.vectorstores import FAISS
+
 
 
 def checkfile_exist(file):
@@ -33,3 +38,91 @@ def checkfile_exist(file):
             do_embedding = "YES"
 
     return file_path, do_embedding
+
+
+def save_embedding(docs, file_name):
+    embedding = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    placeholder = st.empty()
+    placeholder.image("./webartifacts/progress.gif", use_container_width=True)
+    db = FAISS.from_documents(docs, embedding=embedding)
+    embedding_folder = os.path.join("./","embedding", file_name)
+    os.makedirs(embedding_folder, exist_ok=True)
+    db.save_local(folder_path=embedding_folder)
+    placeholder.empty()
+    st.write("Embedding Saved")
+
+
+def get_prompt_template():
+    contextual_prompt = PromptTemplate(
+    input_variables=["context", "question"],
+    template="""
+    You are an AI assistant. Answer the following question **only** using the provided context.
+    
+    Context:
+    {context}
+    
+    Question: {question}
+    
+    If the answer is not found in the context, respond with: "Information not available in the provided context."
+    """
+    )
+
+    
+    return contextual_prompt
+
+
+def get_retriever(file_name):
+    embedding = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    embedding_folder = os.path.join("./","embedding", file_name)
+    db = FAISS.load_local(embedding_folder, embeddings=embedding, allow_dangerous_deserialization=True)
+    retriever = db.as_retriever()
+    return retriever
+
+
+def get_available_embedding():
+    lst = os.listdir("./embedding/")
+    lst.remove('.gitkeep')
+    print(lst)
+    return lst
+
+
+
+def print_history():
+    user_style = """
+        background-color: #DCF8C6;
+        padding: 10px;
+        color: #000;
+        border-radius: 10px;
+        text-align: right;
+        margin: 5px 0;
+    """
+
+    assistant_style = """
+        background-color: #F1F0F0;
+        padding: 10px;
+        color: #000;
+        border-radius: 10px;
+        text-align: left;
+        margin: 5px 0;
+    """
+
+
+    for chat in st.session_state.chat_history:
+        if chat["role"] == "user":
+            st.markdown(
+                f'<div style="{user_style}"><b>👤 You:</b> {chat["content"]}</div>',
+                unsafe_allow_html=True
+            )            
+            
+        else:  # For assistant messages
+            st.markdown(
+                f'<div style="{assistant_style}"><b>🤖 Gemini:</b> {chat["content"]}</div>',
+                unsafe_allow_html=True
+            )
+
+
+    return user_style, assistant_style
+
+def get_gemini_model(api_key):
+    chat_session = genai.GenerativeModel("gemini-1.5-pro")
+    return chat_session.start_chat()
